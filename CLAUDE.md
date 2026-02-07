@@ -34,7 +34,7 @@ The `rlm-skill/` is the only skill containing executable Python scripts. Key det
 - **Language:** Python 3.8+
 - **External dependency:** `curl` (for API calls) and `ANTHROPIC_API_KEY`
 - **Auto-installed packages:** `pdfplumber`, `python-docx`, `beautifulsoup4` (installed on first use by `file_converter.py`)
-- **No test suite** — scripts are standalone CLI tools
+- **Test suite:** `rlm-skill/scripts/tests/` — run with `python -m pytest rlm-skill/scripts/tests/`
 
 ### Running RLM Scripts
 

@@ -139,10 +139,17 @@ except ImportError:
         finally:
             if tmp_file and os.path.exists(tmp_file.name):
                 os.unlink(tmp_file.name)
-        response = json.loads(result.stdout)
-        if 'content' in response:
-            return response['content'][0]['text']
-        raise Exception(f"API error: {response}")
+        if result.returncode != 0:
+            raise Exception(f"curl failed: {result.stderr}")
+        try:
+            response = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            raise Exception(f"Invalid JSON response: {result.stdout[:500]}")
+        if 'error' in response:
+            raise Exception(f"API error: {response['error']}")
+        if 'content' not in response or not response['content']:
+            raise Exception(f"Unexpected response format: {response}")
+        return response['content'][0]['text']
 
     def llm_query_fast(prompt, **kwargs):
         return llm_query(prompt, model="claude-haiku-4-5-20251001", **kwargs)

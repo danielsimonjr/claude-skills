@@ -96,8 +96,11 @@ def detect_file_type(filepath: str) -> str:
         # ZIP (also docx)
         if header.startswith(b'PK\x03\x04'):
             # Check if it's a docx
-            if ext == '.docx' or b'word/' in open(filepath, 'rb').read(1000):
+            if ext == '.docx':
                 return 'docx'
+            with open(filepath, 'rb') as zf:
+                if b'word/' in zf.read(1000):
+                    return 'docx'
             return 'archive'
         # Check if it's readable text
         try:
@@ -233,8 +236,18 @@ def extract_html(filepath: str) -> str:
 
 def _is_safe_tar_member(member: 'tarfile.TarInfo', dest_dir: str) -> bool:
     """Check if a tar member extracts safely within the destination directory."""
-    member_path = os.path.realpath(os.path.join(dest_dir, member.name))
-    return member_path.startswith(os.path.realpath(dest_dir) + os.sep) or member_path == os.path.realpath(dest_dir)
+    if member.issym() or member.islnk():
+        return False
+    member_path = os.path.normpath(os.path.join(os.path.realpath(dest_dir), member.name))
+    dest = os.path.realpath(dest_dir)
+    return member_path.startswith(dest + os.sep) or member_path == dest
+
+
+def _is_safe_zip_member(name: str, dest_dir: str) -> bool:
+    """Check if a zip member extracts safely within the destination directory."""
+    member_path = os.path.normpath(os.path.join(os.path.realpath(dest_dir), name))
+    dest = os.path.realpath(dest_dir)
+    return member_path.startswith(dest + os.sep) or member_path == dest
 
 
 def extract_archive(filepath: str) -> str:
@@ -249,7 +262,9 @@ def extract_archive(filepath: str) -> str:
         # Extract archive
         if filepath.endswith('.zip'):
             with zipfile.ZipFile(filepath, 'r') as zf:
-                zf.extractall(temp_dir)
+                safe_names = [n for n in zf.namelist() if _is_safe_zip_member(n, temp_dir)]
+                for name in safe_names:
+                    zf.extract(name, temp_dir)
         elif filepath.endswith(('.tar', '.tar.gz', '.tgz', '.gz')):
             with tarfile.open(filepath, 'r:*') as tf:
                 safe_members = [m for m in tf.getmembers() if _is_safe_tar_member(m, temp_dir)]

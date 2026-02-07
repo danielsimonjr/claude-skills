@@ -129,11 +129,17 @@ except ImportError:
         finally:
             if tmp_file and os.path.exists(tmp_file.name):
                 os.unlink(tmp_file.name)
-        response = json.loads(result.stdout)
-
-        if 'content' in response:
-            return response['content'][0]['text']
-        raise Exception(f"API error: {response}")
+        if result.returncode != 0:
+            raise Exception(f"curl failed: {result.stderr}")
+        try:
+            response = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            raise Exception(f"Invalid JSON response: {result.stdout[:500]}")
+        if 'error' in response:
+            raise Exception(f"API error: {response['error']}")
+        if 'content' not in response or not response['content']:
+            raise Exception(f"Unexpected response format: {response}")
+        return response['content'][0]['text']
 
     def llm_query_fast(prompt: str, **kwargs) -> str:
         return llm_query(prompt, model=FAST_MODEL, **kwargs)
@@ -283,15 +289,15 @@ YOUR ANALYSIS:"""
     
     try:
         result = query_fn(chunk_prompt, max_tokens=2048)
-        
+
         if "NO_RELEVANT_INFO" in result:
             return None
-        
+
         return result.strip()
-        
+
     except Exception as e:
-        print(f"  ⚠️ Error processing chunk {chunk_index + 1}: {e}", file=sys.stderr)
-        return None
+        print(f"  Warning: Error processing chunk {chunk_index + 1}: {e}", file=sys.stderr)
+        return f"__CHUNK_ERROR__: {e}"
 
 
 def aggregate_results(
@@ -344,10 +350,7 @@ YOUR FINAL ANSWER:"""
 
     query_fn = llm_query_fast if fast_model else llm_query
     
-    try:
-        return query_fn(aggregation_prompt, max_tokens=4096)
-    except Exception as e:
-        return f"Error during aggregation: {e}\n\nRaw findings:\n{combined[:5000]}"
+    return query_fn(aggregation_prompt, max_tokens=4096)
 
 
 def rlm_process(
@@ -438,20 +441,26 @@ def rlm_process(
     log(f"[RLM] Processing {len(indexed_chunks)} chunks...")
     
     results = []
+    error_count = 0
     for i, (orig_idx, chunk) in enumerate(indexed_chunks):
         log(f"[RLM] Processing chunk {i+1}/{len(indexed_chunks)} (original #{orig_idx+1})...")
-        
+
         result = process_chunk(
             chunk, orig_idx, len(chunks), query, fast_model
         )
-        
-        if result:
+
+        if result and result.startswith("__CHUNK_ERROR__"):
+            error_count += 1
+            log(f"  [!] Error: {result[16:]}")
+        elif result:
             results.append((orig_idx, result))
             log(f"  [+] Found relevant info")
         else:
             log(f"  [-] No relevant info")
-    
+
     log(f"[RLM] Found relevant info in {len(results)}/{len(indexed_chunks)} chunks")
+    if error_count > 0:
+        log(f"[RLM] WARNING: {error_count}/{len(indexed_chunks)} chunks failed due to errors")
     
     # Step 5: Aggregate
     log("[RLM] Aggregating results...")
@@ -515,9 +524,10 @@ Reference: Zhang, Kraska, Khattab - "Recursive Language Models" (arXiv:2512.2460
         sys.exit(1)
     
     # Check API key
-    if not os.environ.get('ANTHROPIC_API_KEY'):
-        print("Error: ANTHROPIC_API_KEY environment variable required", file=sys.stderr)
-        print("Set it with: export ANTHROPIC_API_KEY='your-key-here'", file=sys.stderr)
+    if not load_api_key():
+        print("Error: API key not configured.", file=sys.stderr)
+        print("Create file: ~/.claude/api_key.txt", file=sys.stderr)
+        print("Or set ANTHROPIC_API_KEY environment variable.", file=sys.stderr)
         sys.exit(1)
     
     try:

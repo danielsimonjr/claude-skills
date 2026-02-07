@@ -157,8 +157,7 @@ def llm_query(
     if system:
         payload["system"] = system
     
-    if temperature != 1.0:
-        payload["temperature"] = temperature
+    payload["temperature"] = temperature
     
     # Use curl for maximum compatibility (available on Windows 10+)
     payload_json = json.dumps(payload)
