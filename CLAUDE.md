@@ -35,6 +35,7 @@ The `rlm-skill/` is the only skill containing executable Python scripts. Key det
 - **External dependency:** `curl` (for API calls) and `ANTHROPIC_API_KEY`
 - **Auto-installed packages:** `pdfplumber`, `python-docx`, `beautifulsoup4` (installed on first use by `file_converter.py`)
 - **Test suite:** `rlm-skill/scripts/tests/` — run with `python -m pytest rlm-skill/scripts/tests/`
+- **Inline fallbacks:** `rlm_processor.py` and `directory_processor.py` each contain inline copies of `llm_query` and `load_api_key` used when imports fail. Changes to `rlm_query.py` must be mirrored in both fallbacks.
 
 ### Running RLM Scripts
 
@@ -58,3 +59,9 @@ python directory_processor.py ./src "Find bugs" --per-file # Directory processin
 - YAML frontmatter in `SKILL.md` must have `name` and `description` fields — Claude Code uses `description` to decide when to activate the skill.
 - The `scieng-skill/` includes three Node.js renderer scripts (`render-*.js`) that call external APIs (codecogs, quickchart.io, mermaid.ink) to produce SVG files. These require Node.js but no npm dependencies.
 - Cross-references within skills use relative links and `<filename.md>` tag syntax.
+
+## Development Notes
+
+- **Platform:** Windows — use `shutil.which()` for external tool resolution, avoid `shell=True`
+- **Tests:** `python -m pytest rlm-skill/scripts/tests/ -v` from repo root (70 tests)
+- **Archive security:** `file_converter.py` validates all zip/tar member paths before extraction to prevent path traversal
