@@ -58,7 +58,32 @@ python directory_processor.py ./src "Find bugs" --per-file # Directory processin
 - Skill content is Markdown with embedded code examples (not meant to be executed directly, except RLM scripts).
 - YAML frontmatter in `SKILL.md` must have `name` and `description` fields — Claude Code uses `description` to decide when to activate the skill.
 - The `scieng-skill/` includes three Node.js renderer scripts (`render-*.js`) that call external APIs (codecogs, quickchart.io, mermaid.ink) to produce SVG files. These require Node.js but no npm dependencies.
+
+```bash
+# From the scieng-skill/ directory:
+node render-mermaid-to-svg.js input.mmd output.svg   # Mermaid diagrams
+node render-dot-to-svg.js input.dot output.svg        # Graphviz DOT
+node render-latex-to-svg.js "E=mc^2" output.svg       # LaTeX equations
+```
 - Cross-references within skills use relative links and `<filename.md>` tag syntax.
+
+## Generated Content Output Directory
+
+All content generated for the user that is **not specific to an existing project** must be saved to:
+
+```
+C:\Users\danie\.claude\playground\
+```
+
+This includes HTML playgrounds, documents, reports, data files, visualizations, exported assets, and any other generated artifacts — unless the user specifies a different location. Each output gets its own subfolder named after the topic or purpose (e.g., `pml_playground/`, `tax_report/`, `architecture_diagrams/`).
+
+## Playground Authoring
+
+- **Two-file pattern:** For large data-driven playgrounds, split data (`*_data.js`) from UI (`*_playground.html`). Load data via `<script src="...">`.
+- **Chunked writing:** Use sequential Edit operations (4-5 chunks) for large JS data files (1000+ lines) to stay within output token limits.
+- **Validation:** `node -e` with `eval()` — use `globalThis.X` instead of `const X`; forward slashes for Windows paths in `-e` flag.
+- **KaTeX CDN:** `katex@0.16.21` + auto-render extension for math rendering.
+- **Browser open (Windows):** `start "" "path\to\file.html"`
 
 ## Development Notes
 
