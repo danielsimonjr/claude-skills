@@ -11,3 +11,5 @@ scripts/
 
 # Windows artifacts
 nul
+pml_playground.html
+pml_data.js
