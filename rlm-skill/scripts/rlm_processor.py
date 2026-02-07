@@ -532,7 +532,7 @@ Reference: Zhang, Kraska, Khattab - "Recursive Language Models" (arXiv:2512.2460
         print(result)
         
         if args.output:
-            with open(args.output, 'w') as f:
+            with open(args.output, 'w', encoding='utf-8') as f:
                 f.write(result)
             print(f"\n[Saved to {args.output}]", file=sys.stderr)
             
