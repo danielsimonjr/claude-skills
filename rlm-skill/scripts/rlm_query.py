@@ -22,6 +22,7 @@ import os
 import sys
 import json
 import argparse
+import shutil
 import subprocess
 import tempfile
 from typing import Optional
@@ -31,6 +32,21 @@ from pathlib import Path
 # Default models - use cheaper models for sub-calls
 DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
 FAST_MODEL = "claude-haiku-4-5-20251001"  # For high-volume chunk processing
+
+# Cumulative token usage tracking
+_usage = {"input_tokens": 0, "output_tokens": 0, "requests": 0}
+
+
+def get_usage() -> dict:
+    """Return cumulative API token usage for this session."""
+    return dict(_usage)
+
+
+def reset_usage():
+    """Reset the usage counters."""
+    _usage["input_tokens"] = 0
+    _usage["output_tokens"] = 0
+    _usage["requests"] = 0
 
 
 def get_claude_config_dir() -> Path:
@@ -147,19 +163,20 @@ def llm_query(
     # Use curl for maximum compatibility (available on Windows 10+)
     payload_json = json.dumps(payload)
 
-    # Write payload to temp file to avoid Windows command-line length limits (~32K)
+    # Always write payload to temp file to avoid command-line length limits
+    # and to avoid passing sensitive data via command-line arguments
     tmp_file = None
     try:
-        if len(payload_json) > 20000 or sys.platform == 'win32':
-            tmp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8')
-            tmp_file.write(payload_json)
-            tmp_file.close()
-            data_arg = f'@{tmp_file.name}'
-        else:
-            data_arg = payload_json
+        tmp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8')
+        tmp_file.write(payload_json)
+        tmp_file.close()
+        data_arg = f'@{tmp_file.name}'
+
+        # Resolve curl to full path to avoid shell=True on Windows
+        curl_path = shutil.which('curl') or 'curl'
 
         cmd = [
-            'curl', '-s',
+            curl_path, '-s',
             'https://api.anthropic.com/v1/messages',
             '-H', 'Content-Type: application/json',
             '-H', f'x-api-key: {api_key}',
@@ -169,8 +186,7 @@ def llm_query(
 
         result = subprocess.run(
             cmd, capture_output=True, text=True,
-            encoding='utf-8', errors='replace',
-            shell=(sys.platform == 'win32')
+            encoding='utf-8', errors='replace'
         )
     finally:
         if tmp_file and os.path.exists(tmp_file.name):
@@ -189,7 +205,13 @@ def llm_query(
     
     if 'content' not in response or not response['content']:
         raise Exception(f"Unexpected response format: {response}")
-    
+
+    # Track token usage
+    usage = response.get('usage', {})
+    _usage["input_tokens"] += usage.get("input_tokens", 0)
+    _usage["output_tokens"] += usage.get("output_tokens", 0)
+    _usage["requests"] += 1
+
     return response['content'][0]['text']
 
 

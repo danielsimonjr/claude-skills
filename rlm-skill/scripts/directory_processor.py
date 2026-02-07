@@ -86,6 +86,7 @@ except ImportError:
 try:
     from rlm_query import llm_query, llm_query_fast, load_api_key
 except ImportError:
+    import shutil
     import subprocess
 
     def load_api_key():
@@ -122,22 +123,19 @@ except ImportError:
         payload_json = json.dumps(payload)
         tmp_file = None
         try:
-            if len(payload_json) > 20000 or sys.platform == 'win32':
-                tmp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8')
-                tmp_file.write(payload_json)
-                tmp_file.close()
-                data_arg = f'@{tmp_file.name}'
-            else:
-                data_arg = payload_json
-            cmd = ['curl', '-s', 'https://api.anthropic.com/v1/messages',
+            tmp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8')
+            tmp_file.write(payload_json)
+            tmp_file.close()
+            data_arg = f'@{tmp_file.name}'
+            curl_path = shutil.which('curl') or 'curl'
+            cmd = [curl_path, '-s', 'https://api.anthropic.com/v1/messages',
                    '-H', 'Content-Type: application/json',
                    '-H', f'x-api-key: {api_key}',
                    '-H', 'anthropic-version: 2023-06-01',
                    '-d', data_arg]
             result = subprocess.run(
                 cmd, capture_output=True, text=True,
-                encoding='utf-8', errors='replace',
-                shell=(sys.platform == 'win32'))
+                encoding='utf-8', errors='replace')
         finally:
             if tmp_file and os.path.exists(tmp_file.name):
                 os.unlink(tmp_file.name)

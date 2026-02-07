@@ -125,8 +125,17 @@ def install_package(package: str) -> bool:
         return result.returncode == 0
 
 
+MAX_PDF_SIZE = 500_000_000  # 500MB
+
+
 def extract_pdf(filepath: str) -> str:
     """Extract text from PDF file."""
+    file_size = os.path.getsize(filepath)
+    if file_size > MAX_PDF_SIZE:
+        raise ValueError(
+            f"PDF too large ({file_size / 1_000_000:.0f}MB). "
+            f"Max allowed: {MAX_PDF_SIZE / 1_000_000:.0f}MB."
+        )
     # Try pdfplumber first (better quality)
     if install_package('pdfplumber'):
         import pdfplumber
@@ -222,14 +231,20 @@ def extract_html(filepath: str) -> str:
         return text.strip()
 
 
+def _is_safe_tar_member(member: 'tarfile.TarInfo', dest_dir: str) -> bool:
+    """Check if a tar member extracts safely within the destination directory."""
+    member_path = os.path.realpath(os.path.join(dest_dir, member.name))
+    return member_path.startswith(os.path.realpath(dest_dir) + os.sep) or member_path == os.path.realpath(dest_dir)
+
+
 def extract_archive(filepath: str) -> str:
     """Extract and concatenate text files from archive."""
     import zipfile
     import tarfile
-    
+
     text_parts = []
     temp_dir = tempfile.mkdtemp()
-    
+
     try:
         # Extract archive
         if filepath.endswith('.zip'):
@@ -237,7 +252,8 @@ def extract_archive(filepath: str) -> str:
                 zf.extractall(temp_dir)
         elif filepath.endswith(('.tar', '.tar.gz', '.tgz', '.gz')):
             with tarfile.open(filepath, 'r:*') as tf:
-                tf.extractall(temp_dir)
+                safe_members = [m for m in tf.getmembers() if _is_safe_tar_member(m, temp_dir)]
+                tf.extractall(temp_dir, members=safe_members)
         
         # Process extracted files
         for root, dirs, files in os.walk(temp_dir):

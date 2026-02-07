@@ -1,0 +1,14 @@
+# RLM (Recursive Language Model) Processing Dependencies
+# Core scripts: rlm_query.py, rlm_processor.py, file_converter.py, directory_processor.py
+
+# PDF extraction (preferred)
+pdfplumber>=0.9.0
+
+# Word document extraction
+python-docx>=0.8.11
+
+# HTML text extraction
+beautifulsoup4>=4.12.0
+
+# Fallback PDF extraction
+PyPDF2>=3.0.0

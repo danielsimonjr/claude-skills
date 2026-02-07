@@ -45,48 +45,49 @@ except ImportError:
 
 # Import from sibling module
 try:
-    from rlm_query import llm_query, llm_query_fast, DEFAULT_MODEL, FAST_MODEL, load_api_key
+    from rlm_query import llm_query, llm_query_fast, DEFAULT_MODEL, FAST_MODEL, load_api_key, get_usage, reset_usage
 except ImportError:
+    def get_usage():
+        return {"input_tokens": 0, "output_tokens": 0, "requests": 0}
+    def reset_usage():
+        pass
     # If running directly, define inline with Windows/.claude support
+    import shutil
     import subprocess
-    
+
     DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
     FAST_MODEL = "claude-haiku-4-5-20251001"
-    
+
     def load_api_key():
         """Load API key from env var or .claude folder."""
-        # 1. Environment variable
         api_key = os.environ.get('ANTHROPIC_API_KEY')
         if api_key:
             return api_key.strip()
-        
-        # 2. .claude folder
+
         if sys.platform == 'win32':
             base = os.environ.get('USERPROFILE', os.path.expanduser('~'))
         else:
             base = os.path.expanduser('~')
-        
+
         claude_dir = Path(base) / '.claude'
-        
-        # Check api_key.txt
+
         api_key_file = claude_dir / 'api_key.txt'
         if api_key_file.exists():
             try:
                 return api_key_file.read_text().strip()
-            except:
+            except Exception:
                 pass
-        
-        # Check config.json
+
         config_file = claude_dir / 'config.json'
         if config_file.exists():
             try:
                 config = json.loads(config_file.read_text())
                 return config.get('api_key', '').strip()
-            except:
+            except Exception:
                 pass
-        
+
         return None
-    
+
     def llm_query(prompt: str, model: str = DEFAULT_MODEL, max_tokens: int = 4096) -> str:
         api_key = load_api_key()
         if not api_key:
@@ -98,26 +99,24 @@ except ImportError:
                 f"API key not found. Create: {claude_dir / 'api_key.txt'}\n"
                 f"Or set ANTHROPIC_API_KEY environment variable."
             )
-        
+
         payload = {
             "model": model,
             "max_tokens": max_tokens,
             "messages": [{"role": "user", "content": prompt}]
         }
-        
+
         import tempfile
         payload_json = json.dumps(payload)
         tmp_file = None
         try:
-            if len(payload_json) > 20000 or sys.platform == 'win32':
-                tmp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8')
-                tmp_file.write(payload_json)
-                tmp_file.close()
-                data_arg = f'@{tmp_file.name}'
-            else:
-                data_arg = payload_json
+            tmp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8')
+            tmp_file.write(payload_json)
+            tmp_file.close()
+            data_arg = f'@{tmp_file.name}'
+            curl_path = shutil.which('curl') or 'curl'
             cmd = [
-                'curl', '-s', 'https://api.anthropic.com/v1/messages',
+                curl_path, '-s', 'https://api.anthropic.com/v1/messages',
                 '-H', 'Content-Type: application/json',
                 '-H', f'x-api-key: {api_key}',
                 '-H', 'anthropic-version: 2023-06-01',
@@ -125,18 +124,17 @@ except ImportError:
             ]
             result = subprocess.run(
                 cmd, capture_output=True, text=True,
-                encoding='utf-8', errors='replace',
-                shell=(sys.platform == 'win32')
+                encoding='utf-8', errors='replace'
             )
         finally:
             if tmp_file and os.path.exists(tmp_file.name):
                 os.unlink(tmp_file.name)
         response = json.loads(result.stdout)
-        
+
         if 'content' in response:
             return response['content'][0]['text']
         raise Exception(f"API error: {response}")
-    
+
     def llm_query_fast(prompt: str, **kwargs) -> str:
         return llm_query(prompt, model=FAST_MODEL, **kwargs)
 
@@ -459,8 +457,15 @@ def rlm_process(
     log("[RLM] Aggregating results...")
     final_answer = aggregate_results(results, query, fast_model)
     
+    # Log token usage summary
+    usage = get_usage()
+    if usage["requests"] > 0:
+        log(f"[RLM] API usage: {usage['requests']} requests, "
+            f"{usage['input_tokens']:,} input tokens, "
+            f"{usage['output_tokens']:,} output tokens")
+
     log("[RLM] Processing complete!")
-    
+
     return final_answer
 
 
