@@ -1,0 +1,37 @@
+reasoning-skill/
+├── README.md (469 lines) - Overview, quick start, and comprehensive guide
+├── SKILL.md (420 lines) - Main framework with 110 reasoning types
+├── INSTALLATION.md (318 lines) - Setup and usage guide
+│
+├── examples/
+│   ├── fundamental_reasoning_examples.md (469 lines)
+│   │   - Deductive, Inductive, Abductive reasoning
+│   │   - Code examples, mathematical proofs
+│   │   - Practice exercises with solutions
+│   │
+│   └── applied_reasoning_examples.md (701 lines)
+│       - Software Engineering (debugging, architecture, code review)
+│       - Data Science (feature engineering, model selection)
+│       - Scientific Research (hypothesis testing)
+│       - Business Strategy (market analysis)
+│       - Legal Reasoning (case analysis)
+│       - Medical Diagnosis (differential diagnosis)
+│
+└── references/
+    ├── quick_reference.md (405 lines)
+    │   - Decision trees for reasoning selection
+    │   - Common combinations and red flags
+    │   - Emergency troubleshooting guide
+    │
+    ├── reasoning_patterns.md (693 lines)
+    │   - 6 reusable reasoning patterns
+    │   - 10 common anti-patterns with fixes
+    │   - Quality checklists and templates
+    │
+    └── domain_mappings.md (464 lines)
+        - Primary reasoning types by domain
+        - Task-to-reasoning mappings
+        - Industry-specific applications
+        - Skill development pathways
+
+TOTAL: 3,939 lines across 8 markdown files
